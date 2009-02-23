@@ -90,10 +90,10 @@ class ImageWidget(Frame):
         self.yint = [starting_ul[1], starting_ul[1] + starting_size[1]]
 
         ## Event control
-        self.buttonDown = False
-        self.dragging = False
-        self.dragStart = None
-        self.lastActiveMouse = None
+        self.evv_buttonDown = False
+        self.evv_dragging = False
+        self.evv_dragStart = None
+        self.evv_lastActiveMouse = None
 
         ## Widgets
         self.canvas = Canvas(self)
@@ -131,63 +131,63 @@ class ImageWidget(Frame):
         ## And display
         self.refresh()
 
-    def __drag(self, c1, c2):
+    def drag_action(self, c1, c2):
         "Move the canvas image corresponding to a mouse drag move of diff."
         self.canvas.xview_scroll(c1[0] - c2[0], UNITS)
         self.canvas.yview_scroll(c1[1] - c2[1], UNITS)
 
     def ev_Button_1(self, event):
-        self.buttonDown = True
-        self.dragging = False
-        self.dragStart = (event.x, event.y)
-        self.lastActiveMouse = self.dragStart
+        self.evv_buttonDown = True
+        self.evv_dragging = False
+        self.evv_dragStart = (event.x, event.y)
+        self.evv_lastActiveMouse = self.evv_dragStart
 
     def ev_Motion(self, event):
-        if not self.buttonDown:
+        if not self.evv_buttonDown:
             ## Notify handler of new location
             if self.track_func:
                 self.track_func(int(self.canvas.canvasx(event.x) / self.zoom),
                                 int(self.canvas.canvasy(event.y) / self.zoom))
         else:
-            if self.dragging:
+            if self.evv_dragging:
                 ## Already detected a drag; move since last ev_Motion event
-                self.__drag(self.lastActiveMouse, (event.x, event.y))
+                self.drag_action(self.evv_lastActiveMouse, (event.x, event.y))
             else:
                 ## Need to confirm we've been pulled enough to start dragging;
                 ## we might just be in the middle of a sloppy click
-                if distance_squared(self.dragStart, (event.x,event.y)) > 25:
+                if distance_squared(self.evv_dragStart, (event.x,event.y)) > 25:
                     # XXX: Make 25 defined constant
-                    self.__drag(self.dragStart, (event.x, event.y))
-                    self.dragging = True
+                    self.drag_action(self.evv_dragStart, (event.x, event.y))
+                    self.evv_dragging = True
                 else:
                     ## Assuing we're in the middle of a sloppy click
                     pass
-        self.lastActiveMouse = (event.x, event.y)
+        self.evv_lastActiveMouse = (event.x, event.y)
 
     def ev_ButtonRelease_1(self, event):
-        if self.lastActiveMouse != (event.x, event.y):
+        if self.evv_lastActiveMouse != (event.x, event.y):
             # Ignoring this case for now; it's rare, and I don't think will
             # cause any surprising behavior to the user (i.e. it wouldn't
             # only be relevant if they're doing something funky, and wouldn't
             # change the final position by much then.)
             # print "Movement between ev_Motion and ButtonRelease: ", self.lastActiveMouse, " -> ", (event.x, event.y)
             pass
-        if not self.dragging:
+        if not self.evv_dragging:
             ## This was a click
             if self.click_func:
                 self.click_func(int(self.canvas.canvasx(event.x) / self.zoom),
                                 int(self.canvas.canvasy(event.y) / self.zoom))
-        self.dragging = False
-        self.buttonDown = False
-        self.dragStart = None
+        self.evv_dragging = False
+        self.evv_buttonDown = False
+        self.evv_dragStart = None
         # Only need to do anything real here if I'm doing click or rectangle
         # outline or there's mousemovement between ev_Motion and ev_ButtonRelease_1. 
 
     def ev_Leave(self, event):
-        if self.buttonDown:
-            self.dragging = False
-            self.buttonDown = False
-            self.dragStart = None
+        if self.evv_buttonDown:
+            self.evv_dragging = False
+            self.evv_buttonDown = False
+            self.evv_dragStart = None
 
     def ev_MouseWheel(self, event):
         ## Turn into hardcoded constant
