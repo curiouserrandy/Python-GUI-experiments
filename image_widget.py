@@ -7,21 +7,31 @@ import ImageTk
 
 debug = 6
 
+## Naming conventions for this file:
+##	"dbg_" prefix: Debugigng function
+##	Simple noun: Mathematical function converting inputs to that noun
+##	"ev_<event>" prefix: Event handler for the named event
+##	"evv_<name>": Variable used by event handlers only (no higher level)
+##	"_action" suffix: Handle implementing the response to a user's
+##			  action (which needs to be interpretted from the
+##			  events; e.g. it's not a drag unless the mouse moves
+##			  at least 5 pixels)
+
 ## Debugging functions
-def display_args(*args):
+def dbg_display_args(*args):
     print "Args: ", args
 
-def display_event(event):
+def dbg_display_event(event):
     print event.__dict__
 
-def display_tag_and_size(tag, event):
+def dbg_display_tag_and_size(tag, event):
     print tag, ": ", event.width, event.height, event.serial, repr(event.widget)
 
-def printCoords(x, y):
+def dbg_print_coords(x, y):
     print "Coords: ", x, y
 
 
-def coord_dsq(c1, c2):
+def distance_squared(c1, c2):
     "Return the square of the distance between two sets of coords."
     (dx,dy) = (c1[0] - c2[0], c1[1] - c2[1])
     return dx*dx + dy*dy
@@ -31,7 +41,7 @@ class NotYetImplemented(Exception): pass
 ## Stored intervals (eg. xint) here are always [inclusive, exclusive)
 ## Mapnum intervals are not, because we're often mapping to 0,1 in float.
 
-def mapnum(x, fromrange, torange):
+def mapped_number(x, fromrange, torange):
     assert fromrange[0] <= x <= fromrange[1], (fromrange[0], x, fromrange[1])
     assert torange[0] <= torange[1], (torange[0], torange[1])
     ## Need to force floating point
@@ -102,11 +112,11 @@ class ImageWidget(Frame):
         self.canvas["confine"] = True
         # "scrollregion" set in refresh method.
         self.canvas.bind("<Configure>", self.reconfigure, "+")
-        self.canvas.bind("<Button-1>", self.buttonPress)
-        self.canvas.bind("<Motion>", self.mouseMove)
-        self.canvas.bind("<ButtonRelease-1>", self.buttonRelease)
-        self.canvas.bind("<Leave>", self.leaveCanvas)
-        self.canvas.bind("<MouseWheel>", self.mouseWheel)
+        self.canvas.bind("<Button-1>", self.ev_Button_1)
+        self.canvas.bind("<Motion>", self.ev_Motion)
+        self.canvas.bind("<ButtonRelease-1>", self.ev_ButtonRelease_1)
+        self.canvas.bind("<Leave>", self.ev_Leave)
+        self.canvas.bind("<MouseWheel>", self.ev_MouseWheel)
 
         self.canvas_origin_offset = (int(self.canvas["borderwidth"])
                                      + int(self.canvas["highlightthickness"]))
@@ -126,13 +136,13 @@ class ImageWidget(Frame):
         self.canvas.xview_scroll(c1[0] - c2[0], UNITS)
         self.canvas.yview_scroll(c1[1] - c2[1], UNITS)
 
-    def buttonPress(self, event):
+    def ev_Button_1(self, event):
         self.buttonDown = True
         self.dragging = False
         self.dragStart = (event.x, event.y)
         self.lastActiveMouse = self.dragStart
 
-    def mouseMove(self, event):
+    def ev_Motion(self, event):
         if not self.buttonDown:
             ## Notify handler of new location
             if self.track_func:
@@ -140,12 +150,12 @@ class ImageWidget(Frame):
                                 int(self.canvas.canvasy(event.y) / self.zoom))
         else:
             if self.dragging:
-                ## Already detected a drag; move since last mouseMove event
+                ## Already detected a drag; move since last ev_Motion event
                 self.__drag(self.lastActiveMouse, (event.x, event.y))
             else:
                 ## Need to confirm we've been pulled enough to start dragging;
                 ## we might just be in the middle of a sloppy click
-                if coord_dsq(self.dragStart, (event.x,event.y)) > 25:
+                if distance_squared(self.dragStart, (event.x,event.y)) > 25:
                     # XXX: Make 25 defined constant
                     self.__drag(self.dragStart, (event.x, event.y))
                     self.dragging = True
@@ -154,13 +164,13 @@ class ImageWidget(Frame):
                     pass
         self.lastActiveMouse = (event.x, event.y)
 
-    def buttonRelease(self, event):
+    def ev_ButtonRelease_1(self, event):
         if self.lastActiveMouse != (event.x, event.y):
             # Ignoring this case for now; it's rare, and I don't think will
             # cause any surprising behavior to the user (i.e. it wouldn't
             # only be relevant if they're doing something funky, and wouldn't
             # change the final position by much then.)
-            # print "Movement between mouseMove and ButtonRelease: ", self.lastActiveMouse, " -> ", (event.x, event.y)
+            # print "Movement between ev_Motion and ButtonRelease: ", self.lastActiveMouse, " -> ", (event.x, event.y)
             pass
         if not self.dragging:
             ## This was a click
@@ -171,15 +181,15 @@ class ImageWidget(Frame):
         self.buttonDown = False
         self.dragStart = None
         # Only need to do anything real here if I'm doing click or rectangle
-        # outline or there's mousemovement between mouseMove and buttonRelease. 
+        # outline or there's mousemovement between ev_Motion and ev_ButtonRelease_1. 
 
-    def leaveCanvas(self, event):
+    def ev_Leave(self, event):
         if self.buttonDown:
             self.dragging = False
             self.buttonDown = False
             self.dragStart = None
 
-    def mouseWheel(self, event):
+    def ev_MouseWheel(self, event):
         ## Turn into hardcoded constant
         zoomFactor = pow(1.20, event.delta)
         self.zoom *= zoomFactor
@@ -220,26 +230,26 @@ class ImageWidget(Frame):
         self.canvas["scrollregion"] = (0, 0, int(self.isize[0] * self.zoom) -1,
                                        int(self.isize[1] * self.zoom) - 1)
         self.canvas.xview(MOVETO,
-                          mapnum(self.xint[0],
+                          mapped_number(self.xint[0],
                                  (0, int(self.isize[0] * self.zoom) - 1),
                                  (0.0, 1.0)))
         self.canvas.yview(MOVETO,
-                          mapnum(self.yint[0],
+                          mapped_number(self.yint[0],
                                  (0, int(self.isize[1] * self.zoom) - 1),
                                  (0.0, 1.0)))
 
         ## Map x&y interval into unit interval for scroll bars.
         scroll_settings = (
-            (mapnum(self.xint[0],
+            (mapped_number(self.xint[0],
                     (0, self.isize[0] * self.zoom -1),
                     (0, 1)),
-             mapnum(self.xint[1] -1,
+             mapped_number(self.xint[1] -1,
                     (0, self.isize[0] * self.zoom -1),
                     (0, 1))),
-            (mapnum(self.yint[0],
+            (mapped_number(self.yint[0],
                     (0, self.isize[1] * self.zoom -1),
                     (0, 1)),
-             mapnum(self.yint[1] -1,
+             mapped_number(self.yint[1] -1,
                     (0, self.isize[1] * self.zoom -1),
                     (0, 1))))
         if debug > 5:
@@ -296,10 +306,10 @@ if __name__ == "__main__":
     root = Tk()
     root.resizable(True, True)
 
-    # root.bind("<Configure>", lambda e, t="root": display_tag_and_size(t, e))
+    # root.bind("<Configure>", lambda e, t="root": dbg_display_tag_and_size(t, e))
     iw = IWFromFile(root, "iw_test.tiff", starting_ul = (100,100),
                     starting_size = (200, 200), starting_zoom = 1.0,
-                    mouse_click_function = printCoords)
+                    mouse_click_function = dbg_print_coords)
     iw.grid(row=0,column=0,sticky=N+S+E+W)
     root.rowconfigure(0, weight=1)
     root.columnconfigure(0, weight=1)
