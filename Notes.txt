@@ -188,11 +188,67 @@ Tk_moveResizeWindow
   
 ** Todo +
 
+== Convert to self-scroll:
+	* Make refresh image just grab what's needed and put at 0,0
+	* Write own scroll functions
+	* 
+
+== Create a description of all interfaces in file (including methods
+   on ImageWidget) and group them by nature.   
+
 == May want to go over mouse move event handling and see how to break
    it out more simply.  You may well want code separation between
    figuring out what the meaning of what the user is doing, and
    executing what you want to do in response to that meaning.  That
    could be made clean.
+
+** Functions
+
+gfunc_for_image
+
+*** Debugging.  Use dbg_ prefix
+
+printCoords -> dbg_print_coords
+display_args(*args):	-> dbg_display_args
+display_event(event):	-> dbg_display_event
+display_tag_and_size(tag, event):	-> dbg_display_tag_and_size
+
+*** Mathematical transform.  Use name (noun) describing output
+
+coord_dsq   -> distance_squared
+mapnum	    -> mapped_number
+
+*** Widget creation
+
+IWFromFile
+IWFromImage   
+__init__
+
+*** Receiving events.  Use ev_<eventname>
+
+buttonPress   -> ev_Button_1
+mouseMove     -> ev_Motion
+buttonRelease -> ev_ButtonRelease_1
+leaveCanvas   -> ev_Leave
+mouseWheel    -> ev_MouseWheel
+
+Variables just used at this level will be evv_<varname>   
+
+*** Event Meanings.  Use <name>_action
+
+__drag	  -> drag_action
+	  -> click_action
+	  -> zoom_action
+
+*** Canvas report of movement
+
+hset
+vset
+
+*** General recreateion routines.  Just make be refresh.
+
+refresh
+reconfigure: Just called for resize
 
 
 
