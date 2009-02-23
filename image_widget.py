@@ -5,7 +5,7 @@ from Tkinter import *
 from PIL import Image
 import ImageTk
 
-debug = 6
+debug = 0
 
 ## Naming conventions for this file:
 ##	"dbg_" prefix: Debugigng function
@@ -299,11 +299,8 @@ def gfunc_for_image(image, zoom, xint, yint):
     if debug > 5:
         print zoom, xint, yint, isize, ssize
     ri = image.resize(ssize, Image.BILINEAR)
-    print "Past resize."
     ci = ri.crop((xint[0],yint[0],xint[1],yint[1]))
-    print "Past crop."
     ki = ImageTk.PhotoImage(ci)
-    print "Past PhotoImage."
     return ki
 
 def IWFromFile(parent, file, **kwargs):
