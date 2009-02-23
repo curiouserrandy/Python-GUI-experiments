@@ -1,0 +1,274 @@
+## -*-mode: Outline; fill-prefix: "   ";-*-
+
+* Image widget manipulation
+
+** Goals 
+
+-- Primarily a navigational tool.  Thus for the initial implementation,
+   I'm not going to worry about getting information back out of it.
+   (Obviously a worry long-term, but remember interaction; not clear
+   how to provide a good general interface.)
+
+-- Key attributes:
+	* Drag scrolling
+	* Mouse wheel zooming
+	* Different inputs for image:
+		* Function that computes data on the fly (maybe
+   	  	  lowest level interface?)
+		* Single image (large?)
+		* Multiple tiled image (for intermediate sizes) a la
+   	  	  google maps.  I wish I understood google maps
+   	  	  interface.
+	  This suggests that it should be able to output a tiled save
+	  of a large image.  Tricky.
+	* Coordinate display
+	* Scaled coordinate display (low priority; may not be usable
+   	  for ATITD maps, but maybe)
+	* May compute a range of images around the current image to
+	  handle scrolls, pans, and zooms quickly.
+		
+** Plan +
+
+X-- Read in and display a large image file
+
+X-- Allow scrolling via scroll bars.  
+
+X-- Figure out how to adapt to resize events in the top level window   
+
+X-- Add scrolling via drag
+
+X-- Add coordinate display for mouse in base image terms.  Have put in
+   event handling and callback functions into the interface, but
+   haven't mapped the coordinates yet.  Don't forget about the
+   problems you had with canvasx/y; they may not be important, but you
+   should work it out.  Probably you should write a quick summary of
+   all the different coordinate systems and the relationship between
+   them. 
+
+-- Add zooming.  This is foundering because the canvas can't handle
+   too big an image (I think).  Going back to doing scrolling and
+   image re-creation myself; that allows for infinite images anyway
+   (well, with less tweaking).
+
+-- Add ability to use widget from outside to pick a point in image
+   terms.
+
+-- Add ability from outside to use widget to choose a rectangle in
+   image terms.
+
+** Questions
+
+-- Any way to make the init method private, or more generally catch it
+   when someone tries to create a class directly?  (I'm aiming for the
+   java static method as factory pattern)
+** Source notes
+*** Trying to understand grid geometry manager
+
+-- Some important files   
+
+~/utils/tk8.4.19/generic/tkGrid.c
+
+-- Call graph for ArrangeGrid()  (tkGrid.c)
+
+
+ArrangeGrid
+  masterPtr = clientData	# Set widget being laid out
+   
+  # Set abort pointer to abort outer layout of this widget, and set
+  # us up to notice the same thing
+
+  Tcl_Preseve(masterPtr)     # ??
+
+  SetGridSize(masterPtr)
+  height = ResolveConstraints(masterPtr, COLUMN, 0)
+  width = ResolveConstraints(masterPtr, ROW, 0)
+  width += <left & right internal border widths for this widget)
+  height += <top & bottominternal border heights for this widget)
+  # Raise width and height to min requested width/height
+
+  # if width or height don't match requested width/height
+  # and the don't propagate flag is *not* set
+    Tk_GeometryRequest(masterPtr->tkwin, width, height)
+    # If width or height > 1
+      mastPtr->flags |= REQUESTED_RELAYOUT
+      Tcl_DoWhenIdle(ArrangeGrid, masterPtr)
+    # Reset abort pointer
+    Tcl_Release(masterPtr)
+  # else (effectively; there's  return above)
+    # Comemnt says to do weight adjustment if currently requested
+    # layout size doesn't match parent's window size, which is
+    # reverse of how I read the above logic???
+    realWidth = # inside of master
+    realHeight = # inside of master
+    GridMaster::startX = AdjustOffsets(realWidth, columns, GridMaster::columnPtr)
+    GridMaster::startY = AdjustOffsets(realHeight, columns, GridMaster::rowPtr)
+    GridMaster::startX += <internal_border_left>
+    GridMaster::startY += <internal_border_top>
+
+    # For each slave while we haven't been aborted
+      # Set col, row for slave
+      # Set x,y to offsets within grid of this cell
+      # Set widght, height to width of this cell
+      # Set x,y to offsets within master space of this cell
+   
+      # Put window where it belongs.
+      # If slave a child of ours
+        # Deal with width/height < 0.  Otherwise
+	# If changing where we're putting slave
+	  Tk_MoveResizeWindow
+	# Check for aborting
+
+	# If Master is mapped
+	  Tk_MapWindow(slave)
+      # else (not a child of ours)
+        # Deal with width/height < 0.  Otherwise
+	  Tk_MaintainGeometry(slave, master, x, y, width, height)
+    # Reset abort pointer
+    Tcl_Release(masterPtr)
+
+  
+  
+  
+ResolveConstraints
+  # Comment says this resolves all of the row and column boundaries
+  if (slotType == COLUMN)
+    (contraintCount, slotCount, slotPtr) =
+      GridMaster::(columnMax, columnEnd, columnPtr)
+  else
+    (contraintCount, slotCount, slotPtr) =
+      GridMaster::(rowMax, rowEnd, rowPtr)
+
+  layoutPtr = <an array of GridLayout large enough to handle the grid+1>
+
+  # -1 entry in layout pointer is fake to allow simple computations
+  layoutPtr->minOffset = 0
+  layoutPtr->maxOffset = 0
+  layoutPtr++
+
+  # For all constrained slots
+    layoutPtr[slot].(minSize, weight, uniform, pad, binNextPtr) =
+      slotPtr[slot].(minSize, weight, uniform, pad, NULL)
+      
+  # For all remaining slots (after the constrained ones)
+    layoutPtr[slot].(minSize, weight, uniform, pad, binNextPtr) =
+      (0, 0, NULL, 0, NULL)
+
+  # XXX: Stopping here; this is a long function, and I'm not sure I
+  # care about the subtleties.
+  #
+  # The basic algorithm is: Get what the slaves all want along this
+  # axis, and create a grid layout that matches.  Size from children
+  # is determined by Tk_ReqWidth + pad + ipad + doubleBw (twice last
+  # known border width)
+  # Multiple passes are made over the array to deterine actual size
+  # based on weight
+
+AdjustOffsets
+  # Says "adjusts the size of the layout to fit int he space provided,
+  # distributing extra space according to the weights."
+
+  # If weights are zero and extra space, center layout in parent
+  # If weights are zero, and less space, clip bottom/right
+
+  # Add extra space in proportion to the slot weights
+
+  # Handle shrinking
+
+Tk_moveResizeWindow
+  tk_StubsPtr->tk_mvoeResizeWindow
+
+  # OR (looks like X version)
+    XMoveResizeWindow()
+    TkDoConfigureNotify()
+
+# When a scrollbar receives a configure event, it calls
+# TkpComputeScrollbarGeometry.  This function is platform specific;
+# the one I care about is in ~/utils/tk8.4.19/macosx/tkMacOSXScrlbr.c.
+
+  
+** Todo +
+
+== May want to go over mouse move event handling and see how to break
+   it out more simply.  You may well want code separation between
+   figuring out what the meaning of what the user is doing, and
+   executing what you want to do in response to that meaning.  That
+   could be made clean.
+
+
+
+* RFB Protocol Endpoint
+
+** TOC
+
+	* Imports
+	* Keysyms
+	* class ProtocolEndpoint
+		* Methods: read, write
+	* class RFBEndpoint
+		* class variables for protocol formats
+		* Exceptions (all class X(Exception): pass)
+		* Startup methods: __handshake, __initialize, __setup
+		* User operations: show
+		* Client message sends (w/ some variants)
+		* Server message handling:
+			* List of handlers
+			* Read a server message (inc helper functions)
+			* Wait for buffer update
+
+** Cleanup   
+
+X-- Create a TOC of the file, and a TOC of the class.   
+
+-- Move exceptions out of classes when appropriate?  Why are they
+   class associated rather than module associated?   
+
+-- Should you push any entities up to the module level so that you
+   don't have to do self. for them?  Candidates would be the constants
+   and the functions.  Pushing the functions up might give some
+   advantage in namespace hiding, too.  Hmm.  Yep, this could work
+   (can define module namespace by listing public interface in the
+   __all__ variable (sequence of strings)).  Questions:
+	* Keysyms.  Want at top level, under a structure class.
+	* Base protocol object (relation to final; inherit or delegate?)
+	* Protocol functions.  The thing is, protocol functions need a
+   	  socket, so there's no syntactic benefit to not making them
+   	  part of an class.  
+	* Screen interaction: Public interface on object.
+
+-- Think about try/finally blocks around closing socket and what state
+   to leave class in.
+
+-- Think about which encodings to support and how to write the file so
+   that what you're doing is clear.
+
+-- I want a way to separate the protocol handling methods out from
+   the functionality methods.  In some sense, there should be a class
+   that *just* implements the protocol, and then a wrapper or
+   inheritor that implements everything else.
+
+-- Separate file for keysyms?   
+
+-- Go over exceptions and regularize (and make sure that "self." is
+   used)
+
+-- Go over variables and make sure self. is used.
+
+-- Go over debugging printing:
+	* Right levels?
+	* All the way up the stack?
+	* Redirect ok?
+
+-- Look at methods on class; reorganize   
+
+** Todo 
+
+-- Confirm that failure of an import statement leaves the namespace
+   clean.    
+
+-- Debug: Try to import the darn thing until it works.  Do this inside
+   of emacs, with a python shell around and a keyboard macro that does
+   the import for you.
+
+-- Think about how your Keysym number hack effects how you want to
+   manage keysyms.  I'd like people to be able to send ascii codes
+   easily; can they just assume that mapping?  Probably.
