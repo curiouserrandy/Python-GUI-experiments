@@ -7,6 +7,7 @@ import ImageTk
 
 debug = 6
 
+## Debugging functions
 def display_args(*args):
     print "Args: ", args
 
@@ -15,6 +16,10 @@ def display_event(event):
 
 def display_tag_and_size(tag, event):
     print tag, ": ", event.width, event.height, event.serial, repr(event.widget)
+
+def printCoords(x, y):
+    print "Coords: ", x, y
+
 
 def coord_dsq(c1, c2):
     "Return the square of the distance between two sets of coords."
@@ -287,16 +292,13 @@ def IWFromImage(parent, img, **kwargs):
                        **kwargs)
 
 
-def printCoords(x, y):
-    print "Coords: ", x, y
-
 if __name__ == "__main__":
     root = Tk()
     root.resizable(True, True)
 
     # root.bind("<Configure>", lambda e, t="root": display_tag_and_size(t, e))
     iw = IWFromFile(root, "iw_test.tiff", starting_ul = (100,100),
-                    starting_size = (200, 200), starting_zoom = 3.0,
+                    starting_size = (200, 200), starting_zoom = 1.0,
                     mouse_click_function = printCoords)
     iw.grid(row=0,column=0,sticky=N+S+E+W)
     root.rowconfigure(0, weight=1)
