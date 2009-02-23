@@ -202,6 +202,23 @@ Tk_moveResizeWindow
    executing what you want to do in response to that meaning.  That
    could be made clean.
 
+== Holding the mouse down but leaving and re-entering isn't noticed;
+   not the best UI.  
+
+== Create (and use) transformation function that includes zoom?
+
+== Gotta figure out how to expand gfunc_* interface to properly handle
+   bounded/unbounded images (returning errors if bad & etc.)
+
+== Reconsider devision to make xview an action rather than an event.
+
+X== There's going to be a lot of duplication between xview_* and
+   yview_*; refactor?  Yep.  I think this is done,but I could
+   eliminate the last little bit with lambda.  Nope.
+
+== Should mapping funciton enforce limits?  Would make xview/yview
+   simpler; maybe other places.   
+
 ** Functions
 
 gfunc_for_image
