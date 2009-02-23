@@ -17,6 +17,12 @@ debug = 6
 ##			  events; e.g. it's not a drag unless the mouse moves
 ##			  at least 5 pixels)
 
+class NotYetImplemented(Exception): pass
+
+## Stored integer intervals (eg. xint) here are always [inclusive, exclusive)
+## Mapnum intervals are not, because we're often mapping to 0,1 in float;
+## they are (inclusive, inclusive).
+
 ## Debugging functions
 def dbg_display_args(*args):
     print "Args: ", args
@@ -30,16 +36,12 @@ def dbg_display_tag_and_size(tag, event):
 def dbg_print_coords(x, y):
     print "Coords: ", x, y
 
+## Transformation functions
 
 def distance_squared(c1, c2):
     "Return the square of the distance between two sets of coords."
     (dx,dy) = (c1[0] - c2[0], c1[1] - c2[1])
     return dx*dx + dy*dy
-
-class NotYetImplemented(Exception): pass
-
-## Stored intervals (eg. xint) here are always [inclusive, exclusive)
-## Mapnum intervals are not, because we're often mapping to 0,1 in float.
 
 def mapped_number(x, fromrange, torange):
     assert fromrange[0] <= x <= fromrange[1], (fromrange[0], x, fromrange[1])
@@ -47,6 +49,9 @@ def mapped_number(x, fromrange, torange):
     ## Need to force floating point
     x *= 1.0
     return (x - fromrange[0]) / (fromrange[1] - fromrange[0]) * (torange[1] - torange[0]) + torange[0]
+
+def difference(coord_a, coord_b):
+    return (coord_b[0] - coord_a[0], coord_b[1] - coord_a[1])
 
 class ImageWidget(Frame):
     def __init__(self, parent, gfunc, image_size, **kwargs):
@@ -131,10 +136,30 @@ class ImageWidget(Frame):
         ## And display
         self.refresh()
 
-    def drag_action(self, c1, c2):
-        "Move the canvas image corresponding to a mouse drag move of diff."
-        self.canvas.xview_scroll(c1[0] - c2[0], UNITS)
-        self.canvas.yview_scroll(c1[1] - c2[1], UNITS)
+    ## XXX: Need to figure out and specify what coordinates arguments to the
+    ## action functions should be in.
+    ## Currently, canvas coords
+    def drag_action(self, diff):
+        "Respond as appropriate to the user dragging the mouse DIFF pixels (x,y)."
+        self.canvas.xview_scroll(int(diff[0]), UNITS)
+        self.canvas.yview_scroll(int(diff[1]), UNITS)
+
+    def move_action(self, diff):
+        "Respond as appropriate to the user moving the mouse DIFF pixels (not dragging)."
+        if self.track_func:
+            self.track_func(int(diff[0] / self.zoom), int(diff[1] / self.zoom))
+
+    def click_action(self, coord):
+        "Respond as appropriate to the user clicking the mouse button in coord x,y."
+        if self.click_func:
+            self.click_func(int(coord[0] / self.zoom), int(coord[1] / self.zoom))
+
+    def scrollWheel_action(self, count):
+        "Respond as appropriate to the scroll wheel being clicked count times."
+        ## Turn into hardcoded constant
+        zoomFactor = pow(1.20, count)
+        self.zoom = zoomFactor
+        self.refresh()
 
     def ev_Button_1(self, event):
         self.evv_buttonDown = True
@@ -151,13 +176,15 @@ class ImageWidget(Frame):
         else:
             if self.evv_dragging:
                 ## Already detected a drag; move since last ev_Motion event
-                self.drag_action(self.evv_lastActiveMouse, (event.x, event.y))
+                self.drag_action(difference((event.x,event.y),
+                                            self.evv_lastActiveMouse))
             else:
                 ## Need to confirm we've been pulled enough to start dragging;
                 ## we might just be in the middle of a sloppy click
                 if distance_squared(self.evv_dragStart, (event.x,event.y)) > 25:
                     # XXX: Make 25 defined constant
-                    self.drag_action(self.evv_dragStart, (event.x, event.y))
+                    self.drag_action(difference((event.x,event.y),
+                                                self.evv_dragStart))
                     self.evv_dragging = True
                 else:
                     ## Assuing we're in the middle of a sloppy click
@@ -174,9 +201,8 @@ class ImageWidget(Frame):
             pass
         if not self.evv_dragging:
             ## This was a click
-            if self.click_func:
-                self.click_func(int(self.canvas.canvasx(event.x) / self.zoom),
-                                int(self.canvas.canvasy(event.y) / self.zoom))
+            self.click_action((int(self.canvas.canvasx(event.x)),
+                              int(self.canvas.canvasy(event.y))))
         self.evv_dragging = False
         self.evv_buttonDown = False
         self.evv_dragStart = None
@@ -190,11 +216,7 @@ class ImageWidget(Frame):
             self.evv_dragStart = None
 
     def ev_MouseWheel(self, event):
-        ## Turn into hardcoded constant
-        zoomFactor = pow(1.20, event.delta)
-        self.zoom *= zoomFactor
-        print "Zoom: ", self.zoom
-        self.refresh()
+        self.scrollWheel_action(event.delta)
 
     def hset(self, first, last):
         """Interception routine for canvas telling scrollbars how to move;
