@@ -103,20 +103,14 @@ class ImageWidget(Frame):
         ## Widgets
         self.canvas = Canvas(self)
         self.hscroll = Scrollbar(self, orient = HORIZONTAL,
-                                 command = self.canvas.xview)
+                                 command = self.xview_action)
         self.vscroll = Scrollbar(self, orient = VERTICAL,
-                                 command = self.canvas.yview)
-
+                                 command = self.yview_action)
         
         (self.canvas["width"], self.canvas["height"]) = starting_size
-        self.canvas["xscrollcommand"] = self.hset
-        self.canvas["yscrollcommand"] = self.vset
-        self.canvas["xscrollincrement"] = 1
-        self.canvas["yscrollincrement"] = 1
 
-        self.canvas["confine"] = True
         # "scrollregion" set in refresh method.
-        self.canvas.bind("<Configure>", self.reconfigure, "+")
+        self.canvas.bind("<Configure>", self.ev_Configure)
         self.canvas.bind("<Button-1>", self.ev_Button_1)
         self.canvas.bind("<Motion>", self.ev_Motion)
         self.canvas.bind("<ButtonRelease-1>", self.ev_ButtonRelease_1)
@@ -139,11 +133,6 @@ class ImageWidget(Frame):
     ## XXX: Need to figure out and specify what coordinates arguments to the
     ## action functions should be in.
     ## Currently, canvas coords
-    def drag_action(self, diff):
-        "Respond as appropriate to the user dragging the mouse DIFF pixels (x,y)."
-        self.canvas.xview_scroll(int(diff[0]), UNITS)
-        self.canvas.yview_scroll(int(diff[1]), UNITS)
-
     def move_action(self, diff):
         "Respond as appropriate to the user moving the mouse DIFF pixels (not dragging)."
         if self.track_func:
@@ -160,6 +149,66 @@ class ImageWidget(Frame):
         zoomFactor = pow(1.20, count)
         self.zoom = zoomFactor
         self.refresh()
+
+    def resize_action(self, newsize):
+        "Respond as appropriate to a resize event."
+        orig = (self.xint[1], self.yint[1])
+        self.xint[1] = min(self.xint[0]+newsize[0],
+                           int(self.isize[0]*self.zoom))
+        self.yint[1] = min(self.yint[0]+newsize[1],
+                           int(self.isize[1]*self.zoom))
+        if (self.xint[1], self.yint[1]) != orig:
+            self.refresh()
+
+    def drag_action(self, diff):
+        "Respond as appropriate to the user dragging the mouse DIFF pixels (x,y)."
+        origx = [i for i in self.xint]
+        origy = [i for i in self.yint]
+        self.general_scroll_action(self.xint, self.isize[0], diff[0])
+        self.general_scroll_action(self.yint, self.isize[1], diff[1])
+        if origx != self.xint or origy != self.yint: self.refresh()
+
+    ## These next two are somewhere between event handlers and actions;
+    ## they're being put in the action class since they seem closer to a
+    ## user intent than a mouse click.  But I wouldn't have chosen
+    ## this interface.
+    def xview_action(self, subaction, *args):
+        "Handle an xscroll request from a scrollbar."
+        orig = [i for i in self.xint]
+        self.starview_action(self.xint, self.isize[0], subaction, *args)
+        if orig != self.xint: self.refresh()
+
+    def yview_action(self, subaction, *args):
+        "Handle an yscroll request from a scrollbar."
+        orig = [i for i in self.yint]
+        self.starview_action(self.yint, self.isize[1], subaction, *args)
+        if orig != self.yint: self.refresh()
+
+    # Helper methods for {drag,xview,yview}_action
+    @staticmethod
+    def general_scroll_action(axis_int, axis_size, scroll_amount):
+        (s, l) = (axis_int[0], axis_int[1] - axis_int[0])
+        s += scroll_amount
+        s = max(0, min(axis_size - l, s))
+        axis_int[0] = s
+        axis_int[1] = s + l
+
+    @staticmethod
+    def starview_action(axis_int, axis_size, subaction, *args):
+        "Handle a scroll request from a scrollbar."
+        scrollnum = 0
+        if subaction == "scroll":
+            (scrollnum, scrolltype) = args
+            if scrolltype == "pages":
+                scrollnum *= (axis_int[1] - axis_int[0])
+            else:
+                assert scrolltype == "units"
+        elif subaction == "moveto":
+            frac = float(args[0])
+            scrollnum = int(axis_size * frac) - axis_int[0]
+        else:
+            assert False, ("general_scroll_action: Unknown subaction ", subaction)
+        ImageWidget.general_scroll_action(axis_int, axis_size, scrollnum)
 
     def ev_Button_1(self, event):
         self.evv_buttonDown = True
@@ -218,49 +267,26 @@ class ImageWidget(Frame):
     def ev_MouseWheel(self, event):
         self.scrollWheel_action(event.delta)
 
-    def hset(self, first, last):
-        """Interception routine for canvas telling scrollbars how to move;
-        keeps xint correct."""
-        orig = self.xint
-        self.xint = [self.canvas.canvasx(0.0) + self.canvas_origin_offset,
-                     (self.canvas.canvasx(self.canvas["width"])
-                      + self.canvas_origin_offset)]
-        self.hscroll.set(first, last)
-
-    def vset(self, first, last):
-        """Interception routine for canvas telling scrollbars how to move;
-        keeps yint correct."""
-        orig = self.yint
-        self.yint = [self.canvas.canvasy(0.0) + self.canvas_origin_offset,
-                     (self.canvas.canvasy(self.canvas["height"])
-                      + self.canvas_origin_offset)]
-        self.vscroll.set(first, last)
+    def ev_Configure(self, event):
+        self.resize_action((event.width, event.height))
 
     def refresh(self):
         """Bring the image in the frame and the scroll bars in line with the
         current values.  Note that this is not done for scrolling; that's
         taken care of directly by the scrollbar/canvas interactions.
         xint & yint are updated automatically for scrolling."""
+
+        # Delete old image (if needed) and create new one
         if self.canvas_image_id:
             self.canvas.delete(self.canvas_image_id)
-        self.image = self.generator_func(self.zoom,
-                                         (0, int(self.isize[0] * self.zoom)-1),
-                                         (0, int(self.isize[1] * self.zoom)-1))
+        if debug > 5:
+            print "refresh: New image (x", self.zoom, ") ", self.xint, self.yint
+        self.image = self.generator_func(self.zoom, self.xint, self.yint)
 
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=N+W,
                                                         image=self.image)
-        self.canvas["scrollregion"] = (0, 0, int(self.isize[0] * self.zoom) -1,
-                                       int(self.isize[1] * self.zoom) - 1)
-        self.canvas.xview(MOVETO,
-                          mapped_number(self.xint[0],
-                                 (0, int(self.isize[0] * self.zoom) - 1),
-                                 (0.0, 1.0)))
-        self.canvas.yview(MOVETO,
-                          mapped_number(self.yint[0],
-                                 (0, int(self.isize[1] * self.zoom) - 1),
-                                 (0.0, 1.0)))
 
-        ## Map x&y interval into unit interval for scroll bars.
+        # Figure out where scroll bars should be and put them there.
         scroll_settings = (
             (mapped_number(self.xint[0],
                     (0, self.isize[0] * self.zoom -1),
@@ -278,16 +304,8 @@ class ImageWidget(Frame):
             print scroll_settings
         self.hscroll.set(*scroll_settings[0])
         self.vscroll.set(*scroll_settings[1])
-        return
 
-    def reconfigure(self, event):
-        orig = (self.xint[1], self.yint[1])
-        self.xint[1] = min(self.xint[0]+event.width,
-                           int(self.isize[0]*self.zoom))
-        self.yint[1] = min(self.yint[0]+event.height,
-                           int(self.isize[1]*self.zoom))
-        if (self.xint[1], self.yint[1]) != orig:
-            self.refresh()
+
 
 
 ## Room for optimization here; don't need to resize the whole image
