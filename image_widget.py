@@ -152,7 +152,6 @@ class ImageWidget(Frame):
         self.vscroll = Scrollbar(self, orient = VERTICAL,
                                  command = self.yview_action)
         
-        print "Setup: ", (self.canvas["width"], self.canvas["height"])
         (self.canvas["width"], self.canvas["height"]) = starting_size
 
         # "scrollregion" set in refresh method.
@@ -248,7 +247,6 @@ class ImageWidget(Frame):
         zoomFactor = pow(1.20, count)
         view_size = (self.xint[1] - self.xint[0], self.yint[1] - self.yint[0])
         # Block if it's going to be smaller than we can display
-        print self.isize, self.zoom, view_size
         if (self.isize[0] * self.zoom < view_size[0]
             or self.isize[1] * self.zoom < view_size[1]):
             return
@@ -264,7 +262,6 @@ class ImageWidget(Frame):
         # Compute new xint and yint on this basis
         xi = [loc[0] - cloc[0], loc[0] - cloc[0] + view_size[0]]
         yi = [loc[1] - cloc[1], loc[1] - cloc[1] + view_size[1]]
-
 
         print xi, yi, cloc, loc, view_size, self.zoom, zoomFactor, self.isize
         if (xi[0] < 0 or xi[1] > self.zoom * zoomFactor * self.isize[0]
@@ -286,25 +283,17 @@ class ImageWidget(Frame):
             interval[1] = interval[0] + newsize
         elif newsize < image_length:
             # Window can be expanded without whitespace by moving image
-            interval[1] = image_length
+            interval[1] = int(image_length)
             interval[0] = interval[1] - newsize
         else:
             # Set maximum along this length
             interval[0] = 0
-            interval[1] = image_length
+            interval[1] = int(image_length)
 
     def resize_action(self, newsize):
-        "Respond as appropriate to a resize event."
-        if (newsize[0] > self.zoom * self.isize[0] or
-            newsize[1] > self.zoom * self.isize[1]):
-            # Resize message too big; reset and deal with a smaller one
-            # Don't pragate this message; you'll get another one RSN
-            print newsize, self.xint, self.yint
-            self.canvas["width"] = min(newsize[0], self.xint[1])
-            self.canvas["height"] = min(newsize[1], self.yint[1])
         orig = (self.xint[0], self.xint[1], self.yint[0], self.yint[1])
-        self.resize_view_axis(self.xint, newsize[0], self.isize[0])
-        self.resize_view_axis(self.yint, newsize[1], self.isize[1])
+        self.resize_view_axis(self.xint, newsize[0], self.isize[0] * self.zoom)
+        self.resize_view_axis(self.yint, newsize[1], self.isize[1] * self.zoom)
         self.display_size = (self.xint[1] - self.xint[0], self.yint[1] - self.yint[0])
         if (self.xint[0], self.xint[1], self.yint[0], self.yint[1]) != orig:
             self.refresh()
@@ -417,7 +406,6 @@ class ImageWidget(Frame):
         self.scrollWheel_action(event.delta, self.evv_lastActiveMouse)
 
     def ev_Configure(self, event):
-        print "ev_Configure: ", event.serial, (event.width, event.height)
         self.resize_action((event.width, event.height))
 
 ## Room for optimization here; don't need to resize the whole image
