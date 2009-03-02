@@ -302,8 +302,8 @@ class ImageWidget(Frame):
         "Respond as appropriate to the user dragging the mouse DIFF pixels (x,y)."
         origx = [i for i in self.xint]
         origy = [i for i in self.yint]
-        self.general_scroll_action(self.xint, self.isize[0], diff[0])
-        self.general_scroll_action(self.yint, self.isize[1], diff[1])
+        self.general_scroll_action(self.xint, self.isize[0] * self.zoom, diff[0])
+        self.general_scroll_action(self.yint, self.isize[1] * self.zoom, diff[1])
         if origx != self.xint or origy != self.yint: self.refresh()
 
     ## These next two are somewhere between event handlers and actions;
@@ -327,7 +327,7 @@ class ImageWidget(Frame):
     def general_scroll_action(axis_int, axis_size, scroll_amount):
         (s, l) = (axis_int[0], axis_int[1] - axis_int[0])
         s += scroll_amount
-        s = max(0, min(axis_size - l, s))
+        s = max(0, min(int(axis_size) - l, s))
         axis_int[0] = s
         axis_int[1] = s + l
 
@@ -403,7 +403,7 @@ class ImageWidget(Frame):
             self.evv_dragStart = None
 
     def ev_MouseWheel(self, event):
-        self.scrollWheel_action(event.delta, self.evv_lastActiveMouse)
+        self.scrollWheel_action(event.delta, self.winfo_pointerxy())
 
     def ev_Configure(self, event):
         self.resize_action((event.width, event.height))
