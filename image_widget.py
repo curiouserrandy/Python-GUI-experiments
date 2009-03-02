@@ -115,6 +115,14 @@ class ImageWidget(Frame):
         self.click_func = kwargs.get("mouse_click_function", None)
         self.maxsize_callback = kwargs.get("maxsize_callback", None)
         
+        assert len(set(kwargs.keys())
+                   - set(('starting_zoom',
+                          'starting_size',
+                          'starting_ul',
+                          'mouse_tracking_function',
+                          'mouse_click_function',
+                          'maxsize_callback'))) == 0, kwargs
+
         ## XXX: See if there's anything you don't know about and if so throw an
         ## error
 
@@ -246,8 +254,8 @@ class ImageWidget(Frame):
             return
 
         # Compute (scaled) image coords of current point
-        cloc = (int(self.canvas.canvasx(location[0])),
-                int(self.canvas.canvasy(location[1])))
+        cloc = (int(self.canvas.canvasx(location[0])) - 4,
+                int(self.canvas.canvasy(location[1])) - 4)
         loc = (cloc[0] + self.xint[0], cloc[1] + self.yint[0])
 
         # Modify by zoom
@@ -258,7 +266,7 @@ class ImageWidget(Frame):
         yi = [loc[1] - cloc[1], loc[1] - cloc[1] + view_size[1]]
 
 
-        print xi, yi, self.zoom, zoomFactor, self.isize
+        print xi, yi, cloc, loc, view_size, self.zoom, zoomFactor, self.isize
         if (xi[0] < 0 or xi[1] > self.zoom * zoomFactor * self.isize[0]
             or yi[0] < 0 or yi[1] > self.zoom * zoomFactor * self.isize[0]):
             # Ignore event
@@ -406,7 +414,7 @@ class ImageWidget(Frame):
             self.evv_dragStart = None
 
     def ev_MouseWheel(self, event):
-        self.scrollWheel_action(event.delta, (event.x,event.y))
+        self.scrollWheel_action(event.delta, self.evv_lastActiveMouse)
 
     def ev_Configure(self, event):
         print "ev_Configure: ", event.serial, (event.width, event.height)
@@ -470,9 +478,10 @@ if __name__ == "__main__":
     root.resizable(True, True)
 
     # root.bind("<Configure>", lambda e, t="root": dbg_display_tag_and_size(t, e))
-    iw = IWFromFile(root, "iw_test.tiff", starting_ul = (100,100),
+    iw = IWFromFile(root, "iw_test.tiff", starting_ul = (0,0),
                     starting_size = (200, 200), starting_zoom = 1.0,
                     mouse_click_function = dbg_print_coords,
+#                    mouse_tracking_function = dbg_print_coords,
                     maxsize_callback = lambda w,h,r=root: r.maxsize(w,h))
     iw.grid(row=0,column=0, sticky=N+S+E+W)
     root.rowconfigure(0, weight=1)
