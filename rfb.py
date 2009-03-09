@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/python
 
 import struct
 import re
@@ -401,7 +401,7 @@ class ProtocolEndpoint(object):
         while len(inp) < size:
             br = self.sock.recv(size - len(inp))
             if self.debug >= DebugPrintBytes:
-                print >> sys.stderr, "Bytes received on socket: ", [hex(ord(z)) for z in br] 
+                print >> sys.stderr, "Bytes received on socket: ", [hex(ord(z)) for z in br]
             inp += br
         return struct.unpack(descr, inp)
 
@@ -418,7 +418,7 @@ class ProtocolEndpoint(object):
     ## passed/returned in to the function should be determined by
     ## the function.
     def readele(self, descr):
-        """DESCR describes a single argument on the protocol stream, which 
+        """DESCR describes a single argument on the protocol stream, which
         is returned from the routine."""
         result = self.__simpleread(descr)
         assert len(result) == 1
@@ -490,7 +490,7 @@ class ProtocolEndpoint(object):
         l = len(eles)
         self.__simplewrite(descr[0], (l,))
         d2 = descr[0][0] + descr[1] * l
-        if isinstance(eles[0], (tuple,list)): 
+        if isinstance(eles[0], (tuple,list)):
             # Flatten
             eles = reduce(lambda x,y:x+y, eles)
         self.__simplewrite(d2, eles)
@@ -505,16 +505,16 @@ class ProtocolEndpoint(object):
         self.__simplewrite(lengthdescr, (l,))
         d2 = lengthdescr[0] + "%ds" % l
         self.__simplewrite(d2, (s,))
-                
+
 
 ##### Notes on RFBEndpoint
 # Almost all helper routines are put outside of the class itself, as a way
-# of keeping the namespace minimized and focussed on user tasks.              
+# of keeping the namespace minimized and focussed on user tasks.
 # Protocol formats, helper routines, and helper constants defined below,
-# before the actual class.            
+# before the actual class.
 
 # Protocol formats, structured by protocol interaction
-# Handshake 
+# Handshake
 Version = ">12s"                # "RFB %03d.%03d".  3.3, 3.7, or 3.8
 SecTypes = (">B", "B")
 SecType = ">B"                  # One per NumSecTypes
@@ -574,7 +574,7 @@ SetColourMapEntries2 = (">H", "HHH") # number of colors, colors
 Bell = ""                   # Nothing other than message type
 # ServerCutText same as ClientCutText above.
 
-# Helper routines for below class that I want easily accessible and 
+# Helper routines for below class that I want easily accessible and
 # not in the exported namespace
 
 def RFBHandshake(rfbe):
@@ -704,7 +704,7 @@ def RFBreadFrameBufferUpdate(rfbe):
             f(*args)
     if rfbe.debug >= DebugPrintRFBMessages:
         print >> sys.stderr, "Frame buffer update received and processed."
-            
+
 
 def RFBreadSetColourMapEntries(rfbe):
     first = rfbe.readele(SetColourMapEntries1)
@@ -742,9 +742,9 @@ class RFBEndpoint(ProtocolEndpoint):
     # Constants for server side messages
     FrameBufferUpdate = 0
     SetColourMapEntries = 1
-    Bell = 2               
-    ServerCutText = 3      
-    
+    Bell = 2
+    ServerCutText = 3
+
     # Constants for encoding type of frame buffer update
     FBURaw = 0                  # encres == string of length w X h x bytespp
     FBUCopyRect = 1             # encres = (src-x, src-y)
@@ -761,7 +761,7 @@ class RFBEndpoint(ProtocolEndpoint):
             raise
         self.mcallbacks = {}
         self.rcallbacks = {}
-    
+
     ## Get data stored by initialization (and any replacements from later)
     def getFBSize(self):
         return self.fbsize
@@ -874,7 +874,7 @@ class RFBEndpoint(ProtocolEndpoint):
             if self.debug >= DebugPrintRFBDetails:
                 print >> sys.stderr, "Received message, type: ", m
             m = self.readMessage()
-    
+
 class RemoteScreen:
     """Class representing a remote screen."""
 
@@ -888,13 +888,14 @@ class RemoteScreen:
         self.cuttext = ""
         try:
             pf = e.getPixelFormat()
-            ## Reset pf to be the PIL format "RGBX"
-            pf.bpp = 32
-            pf.depth = 24
-            pf.truecolorp = 1
-            pf.rgbmax = (255,255,255)
-            pf.rgbshift = (24, 16, 8)
-            e.setPixelFormat(pf)
+            # ## Reset pf to be the PIL format "RGBX"
+            # pf.bpp = 32
+            # pf.depth = 24
+            # pf.truecolorp = 1
+            # pf.rgbmax = (255,255,255)
+            # pf.rgbshift = (24, 16, 8)
+            # e.setPixelFormat(pf)
+            print "Pixel format: ", pf.__dict__
             size = e.getFBSize()
             self.image = Image.new("RGBX", size)
 
@@ -977,7 +978,7 @@ class RemoteScreen:
         e = self.endpoint
         e.writeargs(ClientMessageType, 5)
         e.writeargs(PointerEvent, 0, x, y)
-        
+
     def pressMouse(self, x, y, buttons):
         """Send a mouse event.  Things like Ctrl-Mouse-1 should be sent
         via sending a ctrl press, a mouse event, and a ctrl release."""
@@ -1008,7 +1009,7 @@ class RemoteScreen:
         self.cuttext = text
 
 if __name__ == "__main__":
-    test = RemoteScreen("localhost", 0, DebugPrintRFBDetails)
-    test.getSubImage(250, 200, 100, 100).show()
+    test = RemoteScreen("localhost", 0, DebugSaveFBUpdate)
+    test.getSubImage(0, 0, 300, 300).show()
     test.close()
-    
+
