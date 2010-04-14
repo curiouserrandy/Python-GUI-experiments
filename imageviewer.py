@@ -26,10 +26,11 @@
 #############################################################################
 
 from PyQt4 import QtCore, QtGui
+import os
 
 
 class ImageViewer(QtGui.QMainWindow):
-    def __init__(self):
+    def __init__(self, image_file = None):
         super(ImageViewer, self).__init__()
 
         self.printer = QtGui.QPrinter()
@@ -52,25 +53,29 @@ class ImageViewer(QtGui.QMainWindow):
         self.setWindowTitle("Image Viewer")
         self.resize(500, 400)
 
+        if image_file: self.__open(image_file)
+
+    def __open(self, filename):
+        image = QtGui.QImage(filename)
+        if image.isNull():
+            QtGui.QMessageBox.information(self, "Image Viewer",
+                    "Cannot load %s." % filename)
+            return
+
+        self.imageLabel.setPixmap(QtGui.QPixmap.fromImage(image))
+        self.scaleFactor = 1.0
+
+        self.printAct.setEnabled(True)
+        self.fitToWindowAct.setEnabled(True)
+        self.updateActions()
+
+        if not self.fitToWindowAct.isChecked():
+            self.imageLabel.adjustSize()
+
     def open(self):
         fileName = QtGui.QFileDialog.getOpenFileName(self, "Open File",
                 QtCore.QDir.currentPath())
-        if fileName:
-            image = QtGui.QImage(fileName)
-            if image.isNull():
-                QtGui.QMessageBox.information(self, "Image Viewer",
-                        "Cannot load %s." % fileName)
-                return
-
-            self.imageLabel.setPixmap(QtGui.QPixmap.fromImage(image))
-            self.scaleFactor = 1.0
-
-            self.printAct.setEnabled(True)
-            self.fitToWindowAct.setEnabled(True)
-            self.updateActions()
-
-            if not self.fitToWindowAct.isChecked():
-                self.imageLabel.adjustSize()
+        if fileName: self.__open(filename)
 
     def print_(self):
         dialog = QtGui.QPrintDialog(self.printer, self)
@@ -192,6 +197,8 @@ if __name__ == '__main__':
     import sys
 
     app = QtGui.QApplication(sys.argv)
-    imageViewer = ImageViewer()
+
+    (program_directory, program_name) = os.path.split(sys.argv[0])
+    imageViewer = ImageViewer(program_directory + "/iw_test.tiff")
     imageViewer.show()
     sys.exit(app.exec_())
