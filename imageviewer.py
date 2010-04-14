@@ -29,6 +29,11 @@ from PyQt4 import QtCore, QtGui
 import os
 
 
+class RScrollArea(QtGui.QScrollArea):
+    # Test to see if I understand about overriding event handlers.
+    def wheelEvent(self, ev):
+        pass
+
 class ImageViewer(QtGui.QMainWindow):
     def __init__(self, image_file = None):
         super(ImageViewer, self).__init__()
@@ -42,7 +47,7 @@ class ImageViewer(QtGui.QMainWindow):
                 QtGui.QSizePolicy.Ignored)
         self.imageLabel.setScaledContents(True)
 
-        self.scrollArea = QtGui.QScrollArea()
+        self.scrollArea = RScrollArea() # See above class derivation
         self.scrollArea.setBackgroundRole(QtGui.QPalette.Dark)
         self.scrollArea.setWidget(self.imageLabel)
         self.setCentralWidget(self.scrollArea)
@@ -190,6 +195,7 @@ class ImageViewer(QtGui.QMainWindow):
     def adjustScrollBar(self, scrollBar, factor):
         scrollBar.setValue(int(factor * scrollBar.value()
                                 + ((factor - 1) * scrollBar.pageStep()/2)))
+
 
 
 if __name__ == '__main__':
