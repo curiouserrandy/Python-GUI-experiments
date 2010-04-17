@@ -29,9 +29,50 @@ from PyQt4 import QtCore, QtGui
 import os
 
 
-class RScrollArea(QtGui.QScrollArea):
-    # Test to see if I understand about overriding event handlers.
+class QScrollZoomArea(QtGui.QScrollArea):
+    """Specialization of QScrollArea to include integrated zooming.
+    This specialization requires the contained widget to automatically
+    size/zoom its contents according to the size of the widget, and
+    to have a sizeHint() that indicates the "natural size" of the contents."""
+    def __init__(self):
+        self.scaleFactor = 1.0
+        QtGui.QScrollArea.__init__(self)
+
+    def scaleFactor(self):
+        """How much has the contained widget been zoomed?"""
+        return self.scaleFactor
+
+    def normalSize(self):
+        """Re-adjust contained widget to natural size."""
+        self.widget().adjustSize()
+        self.scaleFactor = 1.0
+
+    def scale(self, factor, zoomPoint = None):
+        """Zoom the contained widget around the given zoomPoint (default
+        center of viewport)."""
+        hscroll = self.horizontalScrollBar()
+        vscroll = self.verticalScrollBar()
+
+        if zoomPoint is None:
+            zoomPoint = (hscroll.pageStep()/2, vscroll.pageStep()/2)
+
+        self.scaleFactor *= factor
+        self.widget().resize(self.scaleFactor * self.widget().sizeHint())
+
+        self.adjustScrollBar(hscroll, factor, zoomPoint[0])
+        self.adjustScrollBar(vscroll, factor, zoomPoint[1])
+
+    def adjustScrollBar(self, scrollBar, factor, zoomPoint):
+        """Modify the scroll bar location to take account of the zoom factor,
+        keeping the zoomPoint (in viewport coords) in the same place
+        in the viewport."""
+        if zoomPoint is None: zoomPoint = scrollBar.pageStep()/2
+        scrollBar.setValue(int(factor * scrollBar.value()
+                                + ((factor - 1) * zoomPoint)))
+
+    # Default user interface bindings--google maps styl
     def wheelEvent(self, ev):
+        print ev.delta(), ev.pos(), ev.orientation()
         pass
 
 class ImageViewer(QtGui.QMainWindow):
@@ -47,7 +88,7 @@ class ImageViewer(QtGui.QMainWindow):
                 QtGui.QSizePolicy.Ignored)
         self.imageLabel.setScaledContents(True)
 
-        self.scrollArea = RScrollArea() # See above class derivation
+        self.scrollArea = QScrollZoomArea() # See above class derivation
         self.scrollArea.setBackgroundRole(QtGui.QPalette.Dark)
         self.scrollArea.setWidget(self.imageLabel)
         self.setCentralWidget(self.scrollArea)
@@ -94,10 +135,10 @@ class ImageViewer(QtGui.QMainWindow):
             painter.drawPixmap(0, 0, self.imageLabel.pixmap())
 
     def zoomIn(self):
-        self.scaleImage(1.25)
+        self.scrollArea.scale(1.25)
 
     def zoomOut(self):
-        self.scaleImage(0.8)
+        self.scrollArea.scale(0.8)
 
     def normalSize(self):
         self.imageLabel.adjustSize()
@@ -181,22 +222,6 @@ class ImageViewer(QtGui.QMainWindow):
         self.zoomInAct.setEnabled(not self.fitToWindowAct.isChecked())
         self.zoomOutAct.setEnabled(not self.fitToWindowAct.isChecked())
         self.normalSizeAct.setEnabled(not self.fitToWindowAct.isChecked())
-
-    def scaleImage(self, factor):
-        self.scaleFactor *= factor
-        self.imageLabel.resize(self.scaleFactor * self.imageLabel.pixmap().size())
-
-        self.adjustScrollBar(self.scrollArea.horizontalScrollBar(), factor)
-        self.adjustScrollBar(self.scrollArea.verticalScrollBar(), factor)
-
-        self.zoomInAct.setEnabled(self.scaleFactor < 3.0)
-        self.zoomOutAct.setEnabled(self.scaleFactor > 0.333)
-
-    def adjustScrollBar(self, scrollBar, factor):
-        scrollBar.setValue(int(factor * scrollBar.value()
-                                + ((factor - 1) * scrollBar.pageStep()/2)))
-
-
 
 if __name__ == '__main__':
 
