@@ -70,10 +70,16 @@ class QScrollZoomArea(QtGui.QScrollArea):
         scrollBar.setValue(int(factor * scrollBar.value()
                                 + ((factor - 1) * zoomPoint)))
 
-    # Default user interface bindings--google maps styl
+    # Default user interface bindings--google maps style
     def wheelEvent(self, ev):
-        print ev.delta(), ev.pos(), ev.orientation()
-        pass
+        if ev.orientation() != 2:
+            return              # Ignore horizontal scrolling
+
+        # Choosing to ignore the amount by which the wheel was turned
+        # as I think it's way too little for stroke scrolling.
+        delta = 1 if ev.delta() > 0 else -1
+
+        self.scale(1.2 ** delta, (ev.pos().x(), ev.pos().y()))
 
 class ImageViewer(QtGui.QMainWindow):
     def __init__(self, image_file = None):
