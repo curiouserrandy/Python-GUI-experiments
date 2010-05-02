@@ -78,10 +78,11 @@ class QScrollZoomArea(QtGui.QScrollArea):
         self.scaleFactor *= factor
         self.widget().resize(self.scaleFactor * self.widget().sizeHint())
 
-        self.adjustScrollBar(hscroll, factor, zoomPoint[0])
-        self.adjustScrollBar(vscroll, factor, zoomPoint[1])
+        self.adjustScrollBarForZoom(hscroll, factor, zoomPoint[0])
+        self.adjustScrollBarForZoom(vscroll, factor, zoomPoint[1])
 
-    def adjustScrollBar(self, scrollBar, factor, zoomPoint):
+    @staticmethod
+    def adjustScrollBarForZoom(scrollBar, factor, zoomPoint):
         """Modify the scroll bar location to take account of the zoom factor,
         keeping the zoomPoint (in viewport coords) in the same place
         in the viewport."""
@@ -89,7 +90,18 @@ class QScrollZoomArea(QtGui.QScrollArea):
         scrollBar.setValue(int(factor * scrollBar.value()
                                 + ((factor - 1) * zoomPoint)))
 
+    # XXX: Note: Not dealing with edge conditions!!  Doesn't appear to matter;
+    # cool; 
+    @staticmethod
+    def adjustScrollBarForDrag(scrollbar, delta):
+        scrollbar.setValue(scrollbar.value() - delta)
+
     # Default user interface bindings--google maps style
+    def dragScroll(self, p):
+        """Scroll the viewport by the given point (as a delta) in viewport coords."""
+        self.adjustScrollBarForDrag(self.horizontalScrollBar(), p.x())
+        self.adjustScrollBarForDrag(self.verticalScrollBar(), p.y())
+
     def wheelEvent(self, ev):
         if ev.orientation() != 2:
             return              # Ignore horizontal scrolling
@@ -99,6 +111,18 @@ class QScrollZoomArea(QtGui.QScrollArea):
         delta = 1 if ev.delta() > 0 else -1
 
         self.scale(1.2 ** delta, (ev.pos().x(), ev.pos().y()))
+
+    def mousePressEvent(self, ev):
+        print "MousePressEvent: ", ev.button(), ev.pos()
+        if ev.button() != QtCore.Qt.LeftButton:
+            return
+        self._lastMouseLocation = ev.pos()
+
+    def mouseMoveEvent(self, ev):
+        if ev.buttons() != QtCore.Qt.LeftButton:
+            return
+        self.dragScroll(ev.pos() - self._lastMouseLocation)
+        self._lastMouseLocation = ev.pos()
 
 class QLazyImage(QtGui.QWidget):
     """Class to contain an image, note resize events, and present
