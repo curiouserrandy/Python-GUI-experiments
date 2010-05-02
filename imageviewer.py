@@ -28,6 +28,24 @@
 from PyQt4 import QtCore, QtGui
 import os
 
+class CoordXform1D:
+    """Contain details of a transformation between 1-D coordinate frames.
+    Defined by specifying two points in each coordinate frame."""
+    def __init__(self, from1, to1, from2, to2):
+        self.__scale = (to2 - to1) / (1.0 * (from2 - from1))
+        self.__from_offset = - from1
+        self.__to_offset = to1
+    def transform(self, point):
+        return (point + self.__from_offset) * self.__scale + self.__to_offset
+
+class QCoordXform:
+    """Like transformation, except its 2D and works on Qpoints."""
+    def __init__(self, from1, to1, from2, to2):
+        self.__0xform = Transformation(from1.x(), to1.x(), from2.x(), to2.x())
+        self.__1xform = Transformation(from1.y(), to1.y(), from2.y(), to2.y())
+    def transform(self, point):
+        return QPoint(self.__0xform.transform(point.x()),
+                      self.__1xform.transform(point.y()))
 
 class QScrollZoomArea(QtGui.QScrollArea):
     """Specialization of QScrollArea to include integrated zooming.
@@ -81,6 +99,58 @@ class QScrollZoomArea(QtGui.QScrollArea):
 
         self.scale(1.2 ** delta, (ev.pos().x(), ev.pos().y()))
 
+class QLazyImage(QtGui.QWidget):
+    """Class to contain an image, note resize events, and present
+    (through paintEvent()) the image visually, but to only lazily compute
+    the bitmaps to present.  This allows arbitrary resizing of images
+    without lots of excess computation."""
+    class InvalidaArgumnet(StandardError):
+        pass
+    def __init__(self, image):
+        self.setImage(image)
+        self._painter = QtGui.QPainter(self)
+
+    def resizeEvent(self, event):
+        self._size = event.size()
+        self.setScale()
+
+    def paintEvent(self, event):
+        if not self._image:
+            return
+        r = event.region().boundingRect()
+        pf = (QPointF(r.topLeft()), QPointF(r.bottomRight()))
+
+        # What does this region look like in the original image?
+        orig_r = QRectF(r.left() * self._scale[0],
+                        r.top() * self._scale[1],
+                        r.width() * self._scale[0],
+                        r.height() * self.scale[1])
+
+        # Paint the bitmap; scaling done by the painter
+        self._painter(r, self._image, orig_r)
+
+    def sizeHint(self):
+        if self._image:
+            return self._image.size()
+        else:
+            return QtGui.QSize(1,1)
+
+    def setImage(self, image):
+        self._image = image
+        if image:
+            self._size = image.size()
+        else:
+            self._size = QtGui.QSize(1,1)
+            self.setScale()
+
+    def setScale(self):
+        if self._image:
+            self._scale =
+            (self._image.size().width() * 1.0 / self._size.width(),
+             self._image.size().height() * 1.0 / self._size.height())
+        else:
+            self._scale = (1.0, 1.0)
+
 class ImageViewer(QtGui.QMainWindow):
     def __init__(self, image_file = None):
         super(ImageViewer, self).__init__()
@@ -88,15 +158,15 @@ class ImageViewer(QtGui.QMainWindow):
         self.printer = QtGui.QPrinter()
         self.scaleFactor = 0.0
 
-        self.imageLabel = QtGui.QLabel()
-        self.imageLabel.setBackgroundRole(QtGui.QPalette.Base)
-        self.imageLabel.setSizePolicy(QtGui.QSizePolicy.Ignored,
+        self.imageWidget = QLazyImage()
+        self.imageWidget.setBackgroundRole(QtGui.QPalette.Base)
+        self.imageWidget.setSizePolicy(QtGui.QSizePolicy.Ignored,
                 QtGui.QSizePolicy.Ignored)
-        self.imageLabel.setScaledContents(True)
+        self.imageWidget.setScaledContents(True)
 
         self.scrollArea = QScrollZoomArea() # See above class derivation
         self.scrollArea.setBackgroundRole(QtGui.QPalette.Dark)
-        self.scrollArea.setWidget(self.imageLabel)
+        self.scrollArea.setWidget(self.imageWidget)
         self.setCentralWidget(self.scrollArea)
 
         self.createActions()
@@ -114,7 +184,7 @@ class ImageViewer(QtGui.QMainWindow):
                     "Cannot load %s." % filename)
             return
 
-        self.imageLabel.setPixmap(QtGui.QPixmap.fromImage(image))
+        self.imageWidget.setPixmap(QtGui.QPixmap.fromImage(image))
         self.scaleFactor = 1.0
 
         self.printAct.setEnabled(True)
@@ -122,7 +192,7 @@ class ImageViewer(QtGui.QMainWindow):
         self.updateActions()
 
         if not self.fitToWindowAct.isChecked():
-            self.imageLabel.adjustSize()
+            self.imageWidget.adjustSize()
 
     def open(self):
         fileName = QtGui.QFileDialog.getOpenFileName(self, "Open File",
@@ -134,11 +204,11 @@ class ImageViewer(QtGui.QMainWindow):
         if dialog.exec_():
             painter = QtGui.QPainter(self.printer)
             rect = painter.viewport()
-            size = self.imageLabel.pixmap().size()
+            size = self.imageWidget.pixmap().size()
             size.scale(rect.size(), QtCore.Qt.KeepAspectRatio)
             painter.setViewport(rect.x(), rect.y(), size.width(), size.height())
-            painter.setWindow(self.imageLabel.pixmap().rect())
-            painter.drawPixmap(0, 0, self.imageLabel.pixmap())
+            painter.setWindow(self.imageWidget.pixmap().rect())
+            painter.drawPixmap(0, 0, self.imageWidget.pixmap())
 
     def zoomIn(self):
         self.scrollArea.scale(1.25)
@@ -147,7 +217,7 @@ class ImageViewer(QtGui.QMainWindow):
         self.scrollArea.scale(0.8)
 
     def normalSize(self):
-        self.imageLabel.adjustSize()
+        self.imageWidget.adjustSize()
         self.scaleFactor = 1.0
 
     def fitToWindow(self):
